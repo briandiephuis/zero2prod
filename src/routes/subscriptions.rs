@@ -27,7 +27,7 @@ pub async fn subscribe(
     .await
     .map_err(|e| {
         eprintln!("Failed to execute query: {}", e);
-        HttpResponse::InternalServerError().finish()
+        HttpResponse::BadRequest().finish()
     })?;
 
     Ok(HttpResponse::Ok().finish())
