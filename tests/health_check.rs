@@ -1,6 +1,4 @@
 use sqlx::PgPool;
-use sqlx::{Connection, PgConnection};
-use std::net::TcpListener;
 use std::net::TcpListener;
 
 use zero2prod::configuration::get_configuration;
@@ -34,7 +32,7 @@ async fn spawn_app() -> TestApp {
 #[actix_rt::test]
 async fn health_check_works() {
     // Arrange
-    let app = spawn_app();
+    let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     // Act
