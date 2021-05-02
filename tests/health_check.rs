@@ -8,6 +8,8 @@ use zero2prod::startup::run;
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub db_conn: String,
+    pub db_name: String,
 }
 
 /// Spin up an instance of our application
@@ -26,7 +28,27 @@ async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_pool: connection_pool,
+        db_conn: configuration
+            .database
+            .connection_string_without_db()
+            .clone(),
+        db_name: configuration.database.database_name.clone(),
     }
+}
+
+async fn drop_db(app: TestApp) -> () {
+    // Disconnect the connection to the created database
+    // This connection uses the database, so the database itself cannot be dropped by that connection
+    app.db_pool.close().await;
+
+    // Setup a new connection to the overal Postgres instance to be able to drop the test database
+    let mut connection = PgConnection::connect(&app.db_conn)
+        .await
+        .expect("Failed to connect to Postgres");
+    connection
+        .execute(&*format!(r#"DROP DATABASE "{}";"#, app.db_name))
+        .await
+        .expect("Failed to drop database");
 }
 
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
@@ -68,6 +90,8 @@ async fn health_check_works() {
     // Assert
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
+
+    drop_db(app).await;
 }
 
 #[actix_rt::test]
@@ -96,6 +120,8 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     assert_eq!(saved.email, "john@example.com");
     assert_eq!(saved.name, "john");
+
+    drop_db(app).await;
 }
 #[actix_rt::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
@@ -125,4 +151,6 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
             error_message
         );
     }
+
+    drop_db(app).await;
 }
